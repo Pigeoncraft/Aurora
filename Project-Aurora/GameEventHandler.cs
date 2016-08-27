@@ -44,7 +44,6 @@ namespace Aurora
 
         private string process_path = "";
         private long currentTick = 0L;
-        private long nextProcessNameUpdate = 0L;
 
         private PreviewType preview_mode = PreviewType.Desktop;
         private string preview_mode_profile_key = "";
@@ -53,7 +52,13 @@ namespace Aurora
 
         public void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
         {
-            GetActiveWindowsProcessname();
+            string active_process = GetActiveWindowsProcessname();
+
+            if(!String.IsNullOrWhiteSpace(active_process))
+            {
+                process_path = active_process;
+                //Global.logger.LogLine("Process changed: " + process_path, Logging_Level.Info);
+            }
         }
 
         public GameEventHandler()
@@ -77,6 +82,8 @@ namespace Aurora
         {
             dele = new WinEventDelegate(WinEventProc);
             SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, dele, 0, 0, WINEVENT_OUTOFCONTEXT);
+            SetWinEventHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND, IntPtr.Zero, dele, 0, 0, WINEVENT_OUTOFCONTEXT);
+
             try
             {
                 update_timer = new Timer(33);
@@ -109,6 +116,8 @@ namespace Aurora
 
         private const uint WINEVENT_OUTOFCONTEXT = 0;
         private const uint EVENT_SYSTEM_FOREGROUND = 3;
+        private const uint EVENT_SYSTEM_MINIMIZESTART = 0x0016;
+        private const uint EVENT_SYSTEM_MINIMIZEEND = 0x0017;
 
         [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
         static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
@@ -140,12 +149,10 @@ namespace Aurora
         private void update_timer_Tick(object sender, EventArgs e)
         {
 
-            string process_name = System.IO.Path.GetFileName(process_path);
+            string process_name = System.IO.Path.GetFileName(process_path).ToLowerInvariant();
 
             if (Global.Configuration.excluded_programs.Contains(process_name))
-            {
                 return;
-            }
 
             EffectsEngine.EffectFrame newframe = new EffectsEngine.EffectFrame();
 
@@ -200,7 +207,7 @@ namespace Aurora
             }
             else if(profiles.ContainsKey(process_name) && profiles[process_name].IsEnabled())
             {
-                if (process_name == "csgo.exe")
+                if (process_name.Equals("csgo.exe"))
                 {
                     //Update timer set to 100 ticks a second for CSGO for Smooth Bomb Effect
                     update_timer.Interval = 10; // in miliseconds
@@ -260,7 +267,7 @@ namespace Aurora
 
             //Global.logger.LogLine(gs.ToString(), Logging_Level.None, false);
 
-            string process_name = System.IO.Path.GetFileName(process_path);
+            string process_name = System.IO.Path.GetFileName(process_path).ToLowerInvariant();
 
             if (Global.Configuration.excluded_programs.Contains(process_name))
             {
